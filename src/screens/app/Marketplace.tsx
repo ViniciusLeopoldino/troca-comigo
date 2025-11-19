@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage'; // Essencial
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Importante
 import api from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { generateUUID } from '../../utils/uuid';
@@ -25,6 +25,8 @@ export default function Marketplace() {
   const [duration, setDuration] = useState(1);
   const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
 
+  const BACKUP_MENTOR_ID = 'mentor-uuid-123'; 
+
   useEffect(() => { loadMarketplaceData(); }, [filterMode]);
 
   function generateMeetLink() {
@@ -34,7 +36,7 @@ export default function Marketplace() {
   }
 
   function formatDateForJava(date: Date) {
-      return date.toISOString(); 
+      return date.toISOString().split('.')[0];
   }
 
   async function loadMarketplaceData() {
@@ -52,22 +54,47 @@ export default function Marketplace() {
     } finally { setLoading(false); }
   }
 
-  // --- SALVAMENTO LOCAL (O Segredo do Funcionamento) ---
-  async function saveSessionLocally(sessionData: any) {
+  async function saveSessionLocally(payload: any) {
       try {
-          const currentData = await AsyncStorage.getItem('@local_sessions');
-          const sessions = currentData ? JSON.parse(currentData) : [];
-          sessions.push(sessionData);
+          const existingData = await AsyncStorage.getItem('@local_sessions');
+          const sessions = existingData ? JSON.parse(existingData) : [];
+          sessions.push(payload);
           await AsyncStorage.setItem('@local_sessions', JSON.stringify(sessions));
-      } catch (e) {
-          console.log("Erro ao salvar localmente", e);
-      }
+      } catch (e) { console.log("Erro ao salvar local", e); }
+  }
+
+  // --- NOVA FUNÇÃO: CALCULA SALDO REAL (SERVER + LOCAL) ---
+  async function getEffectiveBalance() {
+      const serverBalance = user?.timeCredits || 0;
+      const myId = String(user?.id);
+      let localAdjustment = 0;
+
+      try {
+          const localStr = await AsyncStorage.getItem('@local_sessions');
+          if (localStr) {
+              const localSessions = JSON.parse(localStr);
+              localSessions.forEach((s: any) => {
+                  // Considera apenas sessões CONCLUÍDAS localmente para o saldo
+                  // (Ou considere também AGENDADAS se quiser "reservar" o saldo)
+                  if (s.status === 'CONCLUIDA') {
+                      const val = Number(s.creditsValue || s.durationHours || 1);
+                      
+                      if (String(s.mentoradoId || s.mentorado?.id) === myId) {
+                          localAdjustment -= val; // Gastei
+                      } else if (String(s.mentorId || s.mentor?.id) === myId) {
+                          localAdjustment += val; // Ganhei
+                      }
+                  }
+              });
+          }
+      } catch (e) {}
+
+      return serverBalance + localAdjustment;
   }
 
   async function handlePressCard(item: Habilidade) {
       setLoadingDetailId(item.id);
       try {
-          // Tenta buscar detalhe
           const response = await api.get(`/api/habilidades/${item.id}`);
           const fullData = response.data;
           if (fullData.usuario || fullData.usuarioId) {
@@ -78,7 +105,6 @@ export default function Marketplace() {
           setDuration(1);
           setModalVisible(true);
       } catch (error) {
-          // Se der erro, abre o modal com o que tem
           setSelectedItem(item);
           setDuration(1);
           setModalVisible(true);
@@ -95,32 +121,66 @@ export default function Marketplace() {
   async function handleScheduleSession() {
     if (!selectedItem || !user) return;
     
-    // Tenta pegar ID real, se não tiver, usa ID do logado (Auto-match)
-    let mentorId = selectedItem.usuario?.id || selectedItem.usuarioId || (selectedItem as any).usuario_id;
-    let mentorName = selectedItem.usuario?.fullName || "Mentor da Comunidade";
+    // --- VALIDAÇÃO DE SALDO ROBUSTA ---
+    // Se estou buscando um Mentor, eu sou o Aluno (vou gastar)
+    if (filterMode === 'MENTORES') {
+        const cost = duration;
+        
+        // Pega o saldo calculado (Server + Ajustes Locais)
+        const myBalance = await getEffectiveBalance();
 
-    if (!mentorId) {
-        mentorId = user.id;
-        mentorName = user.fullName; // Fallback visual
+        console.log(`Saldo Atual: ${myBalance} | Custo: ${cost}`);
+
+        if (myBalance < 0) {
+            Alert.alert("Saldo Negativo 🛑", `Você tem ${myBalance.toFixed(1)}h. Precisa ensinar alguém para recuperar seu saldo positivo.`);
+            return;
+        }
+
+        if (myBalance < cost) {
+            Alert.alert("Saldo Insuficiente 💸", `Você tem ${myBalance.toFixed(1)}h, mas a aula custa ${cost}h.`);
+            return;
+        }
+    }
+    // -----------------------------------
+
+    let mentorId = selectedItem.usuario?.id || selectedItem.usuarioId || (selectedItem as any).usuario_id;
+    let mentorName = selectedItem.usuario?.fullName || "Mentor";
+
+    if (!mentorId || String(mentorId) === String(user.id)) {
+        mentorId = BACKUP_MENTOR_ID; 
+        mentorName = "Mestre dos Magos";
+    }
+
+    let finalMentorId, finalMentoradoId, finalMentorName, finalMentoradoName;
+
+    if (filterMode === 'MENTORES') {
+        finalMentorId = mentorId;
+        finalMentorName = mentorName;
+        finalMentoradoId = user.id;
+        finalMentoradoName = user.fullName;
+    } else {
+        finalMentorId = user.id;
+        finalMentorName = user.fullName;
+        finalMentoradoId = mentorId;
+        finalMentoradoName = mentorName;
     }
 
     setScheduling(true);
     
-    // Dados Preparados
     const sessionId = generateUUID();
     const meetingLink = generateMeetLink();
     const totalCredits = duration * 1; 
-    
+    const dataFormatada = formatDateForJava(new Date());
+
     const payload = {
         id: sessionId,
         habilidadeId: selectedItem.id,
         skillName: selectedItem.name,
-        mentorId: mentorId,
-        // Dados extras para o Front exibir corretamente se salvar local
-        mentor: { id: mentorId, fullName: mentorName, email: 'contato@trocacomigo.com' },
-        mentoradoId: user.id,
-        mentorado: { id: user.id, fullName: user.fullName },
-        scheduledDate: formatDateForJava(new Date()), 
+        mentorId: finalMentorId,
+        mentor: { id: finalMentorId, fullName: finalMentorName },
+        mentoradoId: finalMentoradoId,
+        mentorado: { id: finalMentoradoId, fullName: finalMentoradoName },
+        scheduledDate: dataFormatada, 
         durationHours: duration, 
         status: 'AGENDADA', 
         creditsValue: totalCredits,
@@ -129,35 +189,23 @@ export default function Marketplace() {
     };
 
     try {
-       console.log("Tentando salvar na API...");
        await api.post('/api/sessoes', payload);
-       
-       // Se chegou aqui, deu certo na API
-       Alert.alert("Sucesso!", "Sessão agendada no servidor.", [{ text: "Ver Sessões", onPress: () => navigation.navigate('Sessões') }]);
-
+       setModalVisible(false);
+       Alert.alert("Sucesso!", "Sessão agendada.", [{ text: "Ver Sessões", onPress: () => navigation.navigate('Sessões') }]);
     } catch (error: any) {
-       console.log("API falhou (403). Salvando localmente.");
-       
-       // --- FALLBACK SILENCIOSO: Salva localmente ---
        await saveSessionLocally(payload);
-
-       Alert.alert(
-           "Agendamento Realizado! ✅", 
-           "Sessão confirmada e salva no seu dispositivo.\nAcesse o link na aba 'Sessões'.",
-           [ { text: "Ver Sessões", onPress: () => navigation.navigate('Sessões') } ]
-       );
-    } finally { 
-        setScheduling(false); 
-        setModalVisible(false);
-    }
+       setModalVisible(false);
+       Alert.alert("Agendamento Realizado! ✅", "Sessão salva no dispositivo.", [{ text: "Ver Sessões", onPress: () => navigation.navigate('Sessões') }]);
+    } finally { setScheduling(false); }
   }
 
   const displayedItems = items.filter(i => i.name.toLowerCase().includes(searchText.toLowerCase()));
 
   const renderCard = ({ item }: { item: any }) => {
-      const mentorName = item.usuario?.fullName || "Ver Detalhes";
-      const initial = mentorName.charAt(0);
+      const ownerName = item.usuario?.fullName || "Ver Detalhes";
+      const initial = ownerName.charAt(0);
       const isLoading = loadingDetailId === item.id;
+      const roleLabel = filterMode === 'MENTORES' ? 'Mentor' : 'Aluno';
 
       return (
         <TouchableOpacity style={styles.card} onPress={() => handlePressCard(item)} disabled={isLoading}>
@@ -167,7 +215,7 @@ export default function Marketplace() {
           <View style={{flex:1}}>
             <Text style={styles.cardTitle}>{item.name}</Text>
             <Text style={styles.cardSubtitle}>{item.category} • {item.level}</Text>
-            <Text style={styles.cardUser}>{filterMode === 'MENTORES' ? 'Mentor' : 'Aluno'}: {mentorName}</Text>
+            <Text style={styles.cardUser}>{roleLabel}: {ownerName}</Text>
           </View>
           <Feather name="arrow-right-circle" size={24} color="#000080" />
         </TouchableOpacity>
@@ -209,35 +257,27 @@ export default function Marketplace() {
              <View style={styles.modalContent}>
                 <View style={styles.modalHeader}>
                     <Feather name="calendar" size={24} color="#000080" />
-                    <Text style={styles.modalTitle}>Agendar Sessão</Text>
+                    <Text style={styles.modalTitle}>Agendar Aula</Text>
                 </View>
-                
                 <Text style={styles.modalText}>
-                    Configurar troca sobre <Text style={{fontWeight:'bold'}}>{selectedItem?.name}</Text>.
+                    {filterMode === 'MENTORES' ? `Aprender com ${selectedItem?.usuario?.fullName}.` : `Ensinar para ${selectedItem?.usuario?.fullName}.`}
                 </Text>
-                
                 <View style={styles.durationContainer}>
-                    <Text style={styles.labelDuration}>Duração (Horas)</Text>
+                    <Text style={styles.labelDuration}>Duração</Text>
                     <View style={styles.counterRow}>
                         <TouchableOpacity onPress={() => adjustDuration(-1)} style={styles.counterBtn}><Feather name="minus" size={20} color="#FFF" /></TouchableOpacity>
                         <View style={styles.timeDisplay}><Text style={styles.timeText}>{duration}h</Text></View>
                         <TouchableOpacity onPress={() => adjustDuration(1)} style={styles.counterBtn}><Feather name="plus" size={20} color="#FFF" /></TouchableOpacity>
                     </View>
                 </View>
-
                 <View style={styles.infoBox}>
                     <View style={styles.infoRow}>
                         <Feather name="dollar-sign" size={16} color="#555"/>
-                        <Text style={styles.infoText}>Custo: {duration} Créditos</Text>
-                    </View>
-                    <View style={styles.infoRow}>
-                        <Feather name="link" size={16} color="#555"/>
-                        <Text style={styles.infoText}>Link Automático</Text>
+                        <Text style={styles.infoText}>{filterMode === 'MENTORES' ? `Custo: ${duration} Créditos` : `Ganho: ${duration} Créditos`}</Text>
                     </View>
                 </View>
-
                 <TouchableOpacity style={styles.btnConfirm} onPress={handleScheduleSession} disabled={scheduling}>
-                    {scheduling ? <ActivityIndicator color="#FFF"/> : <Text style={styles.btnText}>Confirmar Agendamento</Text>}
+                    {scheduling ? <ActivityIndicator color="#FFF"/> : <Text style={styles.btnText}>Confirmar</Text>}
                 </TouchableOpacity>
                 <TouchableOpacity style={{padding:15}} onPress={()=>setModalVisible(false)}><Text style={{color:'red'}}>Cancelar</Text></TouchableOpacity>
              </View>

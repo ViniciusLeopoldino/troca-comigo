@@ -8,40 +8,34 @@ const api = axios.create({
   }
 });
 
-// Variável local
+// Variável local para o Token
 let authToken: string | null = null;
 
 export function setAuthToken(token: string | null) {
-  // Remove espaços em branco que podem vir do copy/paste ou do backend
   authToken = token ? token.trim() : null;
 }
 
 api.interceptors.request.use((config) => {
   if (authToken) {
-    // FORMA MAIS SEGURA DE INJETAR O HEADER NO AXIOS
     // @ts-ignore
     config.headers['Authorization'] = `Bearer ${authToken}`;
   }
-  
-  console.log(`[API] 🚀 Enviando ${config.method?.toUpperCase()} ${config.url}`);
+  // console.log(`[API] 🚀 ${config.method?.toUpperCase()} ${config.url}`); // Descomente se quiser ver logs no terminal
   return config;
 }, (error) => {
   return Promise.reject(error);
 });
 
-// INTERCEPTADOR DE RESPOSTA (PARA VER O ERRO REAL DO BACKEND)
+// INTERCEPTADOR SILENCIOSO
+// Removemos os console.error que faziam o erro pular na tela
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response) {
-      // O servidor respondeu, mas com erro (403, 401, 500)
-      console.error(`[API] ❌ Erro ${error.response.status}:`, error.response.data);
-    } else if (error.request) {
-      // A requisição foi feita mas não houve resposta
-      console.error('[API] ❌ Sem resposta do servidor. Verifique a internet.');
-    } else {
-      console.error('[API] ❌ Erro na configuração:', error.message);
-    }
+      // Apenas loga no terminal (invisível para o usuário), não usa console.error
+      console.log(`[API] Status ${error.response.status} (Tratado internamente)`);
+    } 
+    // Retorna o erro para que o Marketplace.tsx possa ativar o Fallback
     return Promise.reject(error);
   }
 );

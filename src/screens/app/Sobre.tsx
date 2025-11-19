@@ -14,10 +14,14 @@ export default function Sobre() {
         
         {/* Logo e Título */}
         <View style={styles.header}>
-          <View style={styles.logoContainer}>
-            <Text style={{fontSize: 50}}>🧠</Text>
-          </View>
-          <Text style={styles.title}>Troca <Text style={{color: '#4CAF50'}}>Comigo</Text></Text>
+        <View>
+                            <Image
+                              source={require('../../../assets/logo.png')}
+                              style={{ width: 200, height: 200 }}
+                              resizeMode="contain"
+                            />  
+        </View>
+          {/* <Text style={styles.title}>Troca <Text style={{color: '#4CAF50'}}>Comigo</Text></Text> */}
           
         </View>
 
@@ -74,11 +78,11 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#D6EFFF' },
   scrollContent: { padding: 20, paddingBottom: 40 },
   header: { alignItems: 'center', marginBottom: 30, marginTop: 20 },
-  logoContainer: { 
-    width: 100, height: 100, backgroundColor: '#FFF', borderRadius: 50, 
-    justifyContent: 'center', alignItems: 'center', marginBottom: 10,
-    elevation: 5
-  },
+  // logoContainer: { 
+  //   width: 100, height: 100, backgroundColor: '#FFF', borderRadius: 50, 
+  //   justifyContent: 'center', alignItems: 'center', marginBottom: 10,
+  //   elevation: 5
+  // },
   title: { fontSize: 28, fontWeight: 'bold', color: '#000080' },
   subtitle: { fontSize: 16, color: '#666' },
   
