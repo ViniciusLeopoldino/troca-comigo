@@ -18,6 +18,7 @@ export interface Habilidade {
   isOffering: boolean; // Mapeia is_offering (1=true, 0=false)
   isSeeking: boolean;  // Mapeia is_seeking
   usuario?: User;      // Relacionamento ManyToOne
+  usuarioId?: string;  // ...OU pode vir apenas o ID solto
 }
 
 export interface Sessao {
