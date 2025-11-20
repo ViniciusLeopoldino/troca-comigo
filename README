@@ -1,0 +1,22 @@
+# Global Solution - Troca Comigo (SkillSwap Hub) 🚀
+
+## Integrantes
+* Nome: Guilherme Felipe da Silva Souza - RM: 558282
+* Nome: Pablo Lopes Doria de Andrade - RM: 556834
+* Nome: Vinicius Leopoldino de Oliveira - RM: 557047
+
+## Descrição da Solução
+O Troca Comigo é uma plataforma mobile colaborativa onde usuários trocam conhecimentos (habilidades) utilizando créditos de tempo, sem envolver dinheiro. O App consome uma API Java Spring Boot robusta.
+
+## Funcionalidades
+* Autenticação JWT (Login/Cadastro)
+* Marketplace de Habilidades (Busca e Listagem)
+* Agendamento de Sessões (Integração com Google Meet simulada)
+* Carteira de Créditos de Tempo
+* IA Matchmaking (Recomendação inteligente)
+
+## Link do Vídeo (YouTube)
+[]
+
+## Link para Download do App (APK)
+[]

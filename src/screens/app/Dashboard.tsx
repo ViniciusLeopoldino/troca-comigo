@@ -7,7 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
 import api from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
-import { Habilidade, Sessao } from '../../@types';
+import { Habilidade } from '../../@types';
 
 export default function Dashboard() {
   const { user, updateUser } = useAuth();
@@ -21,50 +21,59 @@ export default function Dashboard() {
 
   async function fetchDashboardData() {
     try {
-      // 1. Busca Dados Frescos do Usuário (Saldo do Servidor)
+      // 1. Busca Dados do Usuário e Rating do Servidor
       let serverBalance = 10;
+      let serverRating = 0;
       try {
           const userRes = await api.get('/api/users/me');
           const u = userRes.data;
-          setCurrentRating(u.averageRating || 5.0);
+          serverRating = u.averageRating || 0;
           serverBalance = u.timeCredits !== undefined ? u.timeCredits : 10;
-          // Atualiza contexto global se necessário
-          // updateUser(); 
       } catch (e) { 
-          // Se falhar, usa o que temos em cache
-          serverBalance = user?.timeCredits || 10;
+          serverBalance = user?.timeCredits || 10; 
       }
 
-      // 2. Busca Habilidades
+      // 2. CÁLCULO REAL DA AVALIAÇÃO (Combinado)
+      try {
+          const localRatingsJson = await AsyncStorage.getItem('@local_ratings_map');
+          const localMap = localRatingsJson ? JSON.parse(localRatingsJson) : {};
+          const localValues: number[] = Object.values(localMap); 
+          
+          if (localValues.length > 0) {
+              // Calcula média das notas locais
+              const localSum = localValues.reduce((a, b) => a + b, 0);
+              const localAvg = localSum / localValues.length;
+              
+              // Se tiver nota do server, faz média das médias (simplificado)
+              // Se não, usa só a local
+              const finalAvg = serverRating > 0 ? (serverRating + localAvg) / 2 : localAvg;
+              setCurrentRating(finalAvg);
+          } else {
+              setCurrentRating(serverRating > 0 ? serverRating : 5.0);
+          }
+      } catch (e) { console.log("Erro rating"); }
+
+      // 3. Habilidades
       try {
         const skillRes = await api.get('/api/habilidades/me');
         setSkills(skillRes.data);
       } catch (e) {}
 
-      // 3. Busca Sessões (Backend + Local)
+      // 4. Sessões e Créditos
       let allSessions: any[] = [];
-      
-      // Backend
       try {
-          const sessaoRes = await api.get('/api/sessoes/me');
-          if(Array.isArray(sessaoRes.data)) allSessions = [...sessaoRes.data];
+          const res = await api.get('/api/sessoes/me');
+          if(Array.isArray(res.data)) allSessions = [...res.data];
       } catch (e) {}
-
-      // Local (Importante para o cálculo otimista)
-      let localSessions: any[] = [];
       try {
           const localStr = await AsyncStorage.getItem('@local_sessions');
-          if (localStr) {
-              localSessions = JSON.parse(localStr);
-              allSessions = [...allSessions, ...localSessions];
-          }
+          if (localStr) allSessions = [...allSessions, ...JSON.parse(localStr)];
       } catch (e) {}
 
-      // Remove duplicatas de visualização
       const uniqueSessions = Array.from(new Map(allSessions.map(item => [item.id, item])).values());
       const myId = String(user?.id);
 
-      // --- CÁLCULO DE ESTATÍSTICAS ---
+      // Stats
       const dadas = uniqueSessions.filter((s: any) => {
           const mentorId = s.mentor?.id || s.mentorId;
           return String(mentorId) === myId && s.status === 'CONCLUIDA';
@@ -77,32 +86,28 @@ export default function Dashboard() {
 
       setStats({ dadas, recebidas });
 
-      // --- CÁLCULO INTELIGENTE DE CRÉDITOS ---
-      // Começamos com o saldo que vem do banco
-      let finalBalance = serverBalance;
+      // Créditos (Otimista)
+      let adjustment = 0;
+      // Considera ajustes das sessões locais que o servidor pode não ter processado ainda
+      uniqueSessions.forEach((s:any) => {
+          // Se está concluída, impacta o saldo
+           if (s.status === 'CONCLUIDA') {
+               // Verifica se é uma sessão que existe apenas localmente para não duplicar o saldo do servidor
+               // (Lógica simplificada: recalcula tudo baseado no 10 inicial + movimentos)
+               const val = Number(s.creditsValue || 1);
+               const mId = String(s.mentor?.id || s.mentorId);
+               const aId = String(s.mentorado?.id || s.mentoradoId);
 
-      // Percorremos as sessões LOCAIS. Se elas estiverem CONCLUIDAS, aplicamos o ajuste manualmente
-      // pois o servidor provavelmente não contabilizou ainda (devido ao erro 403 ou delay).
-      localSessions.forEach((s: any) => {
-          if (s.status === 'CONCLUIDA') {
-              const valor = Number(s.creditsValue || s.durationHours || 1);
-              const mentorId = String(s.mentor?.id || s.mentorId);
-              const alunoId = String(s.mentorado?.id || s.mentoradoId);
-
-              if (mentorId === myId) {
-                  // Eu ensinei -> Ganho créditos
-                  finalBalance += valor;
-              } else if (alunoId === myId) {
-                  // Eu aprendi -> Gasto créditos
-                  finalBalance -= valor;
-              }
-          }
+               if (mId === myId) adjustment += val;
+               if (aId === myId) adjustment -= val;
+           }
       });
-
-      setDisplayCredits(finalBalance);
+      
+      // Base 10 + Movimentos
+      setDisplayCredits(10 + adjustment);
 
     } catch (error) {
-      console.log("Erro Geral Dashboard", error);
+      console.log("Erro Geral", error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -115,9 +120,9 @@ export default function Dashboard() {
   const seeking = skills.filter(s => s.isSeeking);
 
   const RatingStars = ({ rating }: { rating: number }) => (
-      <View style={{flexDirection:'row', marginTop:5}}>
-          {[1,2,3,4,5].map(i => <Feather key={i} name="star" size={18} color={i <= rating ? "#FFD700" : "#CCC"} />)}
-          <Text style={{marginLeft: 8, color: '#666', fontWeight: 'bold'}}>{rating.toFixed(1)}</Text>
+      <View style={{flexDirection:'row', marginTop:5, alignItems:'center'}}>
+          {[1,2,3,4,5].map(i => <Feather key={i} name="star" size={18} color={i <= Math.round(rating) ? "#FFD700" : "#CCC"} />)}
+          <Text style={{marginLeft: 8, color: '#666', fontWeight: 'bold', fontSize:16}}>{rating.toFixed(1)}</Text>
       </View>
   );
 
@@ -170,7 +175,6 @@ export default function Dashboard() {
         
         <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>Minhas Habilidades</Text>
-            
             {loading ? <ActivityIndicator color="#000080" /> : (
                 <View>
                     {skills.length === 0 && <Text style={styles.emptyText}>Nenhuma habilidade cadastrada.</Text>}
@@ -179,11 +183,7 @@ export default function Dashboard() {
                         <View style={{marginBottom: 20}}>
                             <Text style={styles.subTitle}>Oferecendo ({offering.length})</Text>
                             <View style={styles.badgesRow}>
-                                {offering.map(s => (
-                                    <View key={s.id} style={[styles.badge, {backgroundColor: '#E8F5E9'}]}>
-                                        <Text style={[styles.badgeText, {color:'#2E7D32'}]}>{s.name}</Text>
-                                    </View>
-                                ))}
+                                {offering.map(s => <View key={s.id} style={[styles.badge, {backgroundColor: '#E8F5E9'}]}><Text style={[styles.badgeText, {color:'#2E7D32'}]}>{s.name}</Text></View>)}
                             </View>
                         </View>
                     )}
@@ -192,11 +192,7 @@ export default function Dashboard() {
                         <View>
                             <Text style={styles.subTitle}>Buscando Aprender ({seeking.length})</Text>
                             <View style={styles.badgesRow}>
-                                {seeking.map(s => (
-                                    <View key={s.id} style={[styles.badge, {backgroundColor: '#E3F2FD'}]}>
-                                        <Text style={[styles.badgeText, {color:'#1565C0'}]}>{s.name}</Text>
-                                    </View>
-                                ))}
+                                {seeking.map(s => <View key={s.id} style={[styles.badge, {backgroundColor: '#E3F2FD'}]}><Text style={[styles.badgeText, {color:'#1565C0'}]}>{s.name}</Text></View>)}
                             </View>
                         </View>
                     )}

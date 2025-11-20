@@ -4,8 +4,16 @@ import { Feather } from '@expo/vector-icons';
 
 export default function Sobre() {
   // Função para abrir o GitHub (opcional, mas agrega valor)
-  const handleOpenLink = () => {
-    Linking.openURL('https://github.com/seu-usuario/troca-comigo');
+  const handleOpenLinkUser1 = () => {
+    Linking.openURL('https://github.com/GuiFelSS');
+  };
+
+    const handleOpenLinkUser2 = () => {
+    Linking.openURL('https://github.com/Pablo0703');
+  };
+
+    const handleOpenLinkUser3 = () => {
+    Linking.openURL('https://github.com/ViniciusLeopoldino');
   };
 
   return (
@@ -40,25 +48,37 @@ export default function Sobre() {
         {/* Card: Integrantes (Requisito Obrigatório) */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Feather name="users" size={24} color="#000080" />
+            <Feather name="users" size={24} color="#000000ff" />
             <Text style={styles.cardTitle}>Desenvolvedores</Text>
           </View>
           
           <View style={styles.member}>
-            <Text style={styles.memberName}>Guilherme</Text>
-            <Text style={styles.memberRm}>RM: 12345</Text>
+            <Text style={styles.memberName}>Guilherme Felipe da Silva Souza</Text>
+            <Text style={styles.memberRm}>RM: 558282</Text>
+              <TouchableOpacity onPress={handleOpenLinkUser1} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+              <Feather name="github" size={20} color="#000000ff" />
+              <Text style={{ color: '#000000ff', marginLeft: 8, fontWeight: 'bold'  }}>GitHub</Text>
+            </TouchableOpacity>
           </View>
           <View style={styles.divider} />
           
           <View style={styles.member}>
-            <Text style={styles.memberName}>Pablo</Text>
-            <Text style={styles.memberRm}>RM: 67890</Text>
+            <Text style={styles.memberName}>Pablo Lopes Doria de Andrade</Text>
+            <Text style={styles.memberRm}>RM: 556834</Text>
+              <TouchableOpacity onPress={handleOpenLinkUser2} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+              <Feather name="github" size={20} color="#000000ff" />
+              <Text style={{ color: '#000000ff', marginLeft: 8, fontWeight: 'bold'  }}>GitHub</Text>
+            </TouchableOpacity>
           </View>
           <View style={styles.divider} />
           
           <View style={styles.member}>
-            <Text style={styles.memberName}>Vinicius</Text>
-            <Text style={styles.memberRm}>RM: 11223</Text>
+            <Text style={styles.memberName}>Vinicius Leopoldino de Oliveira</Text>
+            <Text style={styles.memberRm}>RM: 557047</Text>
+            <TouchableOpacity onPress={handleOpenLinkUser3} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8 }}>
+              <Feather name="github" size={20} color="#000000ff" />
+              <Text style={{ color: '#000000ff', marginLeft: 8, fontWeight: 'bold' }}>GitHub</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
