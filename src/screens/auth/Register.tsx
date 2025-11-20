@@ -91,6 +91,7 @@ export default function Register({ navigation }: any) {
               placeholder="Nome Completo"
               value={fullName}
               onChangeText={setFullName}
+              placeholderTextColor="#777"
             />
           </View>
 
@@ -103,6 +104,7 @@ export default function Register({ navigation }: any) {
               autoCapitalize="none"
               value={email}
               onChangeText={setEmail}
+              placeholderTextColor="#777"
             />
           </View>
 
@@ -114,6 +116,7 @@ export default function Register({ navigation }: any) {
               secureTextEntry
               value={password}
               onChangeText={setPassword}
+              placeholderTextColor="#777"
             />
           </View>
 
@@ -125,6 +128,7 @@ export default function Register({ navigation }: any) {
               secureTextEntry
               value={confirmPassword}
               onChangeText={setConfirmPassword}
+              placeholderTextColor="#777"
             />
           </View>
 
@@ -196,7 +200,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    color: '#333',
+    color: '#333'
   },
   button: { 
     width: '100%', 

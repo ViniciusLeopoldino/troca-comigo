@@ -64,6 +64,7 @@ export default function Login({ navigation }: any) {
             keyboardType="email-address"
             value={email}
             onChangeText={setEmail}
+            placeholderTextColor="#777"
           />
           
           <TextInput 
@@ -72,6 +73,7 @@ export default function Login({ navigation }: any) {
             secureTextEntry
             value={senha}
             onChangeText={setSenha}
+            placeholderTextColor="#777"
           />
 
           <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
