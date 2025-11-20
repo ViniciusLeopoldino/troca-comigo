@@ -16,7 +16,7 @@ export default function Sessoes() {
   const [sessions, setSessions] = useState<Sessao[]>([]);
   const [loading, setLoading] = useState(false);
   
-  // Controle de notas locais para exibir no card
+  // Mapa de avaliações locais
   const [myRatings, setMyRatings] = useState<{[key: string]: number}>({});
 
   // Estados de Avaliação
@@ -31,24 +31,26 @@ export default function Sessoes() {
   async function loadSessions() {
     setLoading(true);
     try {
-      // 1. Busca Sessões
+      // 1. Backend
       let backendData: Sessao[] = [];
       try {
           const res = await api.get('/api/sessoes/me');
           if (Array.isArray(res.data)) backendData = res.data;
-      } catch (e) {}
+      } catch (e) { console.log("Erro backend"); }
 
+      // 2. Local
       let localData: Sessao[] = [];
       try {
           const localStr = await AsyncStorage.getItem('@local_sessions');
           if (localStr) localData = JSON.parse(localStr);
-      } catch (e) {}
+      } catch (e) { console.log("Erro local"); }
 
+      // 3. Unifica
       const all = [...localData, ...backendData];
       const unique = Array.from(new Map(all.map(item => [item.id, item])).values());
       setSessions(unique);
 
-      // 2. Busca Avaliações Locais para pintar as estrelas
+      // 4. Ratings Locais
       try {
           const ratingsStr = await AsyncStorage.getItem('@local_ratings_map');
           if (ratingsStr) setMyRatings(JSON.parse(ratingsStr));
@@ -69,7 +71,7 @@ export default function Sessoes() {
   }
 
   async function cancelSession(id: string) {
-      Alert.alert("Cancelar", "Deseja cancelar a sessão?", [
+      Alert.alert("Cancelar", "Confirmar cancelamento?", [
           { text: "Não", style: "cancel" },
           { text: "Sim", style: 'destructive', onPress: async () => {
               try {
@@ -82,6 +84,32 @@ export default function Sessoes() {
               }
           }}
       ]);
+  }
+
+  // --- NOVA FUNÇÃO: APAGAR DO HISTÓRICO (LOCAL) ---
+  async function deleteFromHistory(id: string) {
+      Alert.alert(
+          "Apagar do Histórico", 
+          "Isso removerá este item da sua lista no app.", 
+          [
+            { text: "Cancelar", style: "cancel" },
+            { text: "Apagar", style: 'destructive', onPress: async () => {
+                // 1. Remove da lista visual
+                const newSessions = sessions.filter(s => s.id !== id);
+                setSessions(newSessions);
+
+                // 2. Remove do Storage Local (se existir lá)
+                try {
+                    const localStr = await AsyncStorage.getItem('@local_sessions');
+                    if (localStr) {
+                        const localData = JSON.parse(localStr);
+                        const newLocalData = localData.filter((s: any) => s.id !== id);
+                        await AsyncStorage.setItem('@local_sessions', JSON.stringify(newLocalData));
+                    }
+                } catch (e) { console.log("Erro ao deletar local"); }
+            }}
+          ]
+      );
   }
 
   async function completeSession(id: string) {
@@ -97,18 +125,15 @@ export default function Sessoes() {
       }
   }
 
-  // --- NOVA LÓGICA DE AVALIAÇÃO ---
   async function sendReview() {
       if(!selectedSession || !user) return;
       setSendingReview(true);
       
-      const avaliadoId = user.id === selectedSession.mentor?.id ? selectedSession.mentorado?.id : selectedSession.mentor?.id;
-
       const payload = {
           id: generateUUID(),
           sessao: { id: selectedSession.id }, sessaoId: selectedSession.id,
           avaliador: { id: user.id }, avaliadorId: user.id,
-          avaliado: { id: avaliadoId }, avaliadoId: avaliadoId,
+          avaliado: { id: selectedSession.mentor?.id }, avaliadoId: selectedSession.mentor?.id,
           rating, comment, createdDate: new Date().toISOString().split('.')[0]
       };
 
@@ -118,7 +143,6 @@ export default function Sessoes() {
       } catch (error) { 
           console.log("API falhou, salvando local.");
       } finally { 
-          // SALVA A NOTA LOCALMENTE PARA O DASHBOARD LER
           try {
               const currentMap = { ...myRatings, [selectedSession.id]: rating };
               setMyRatings(currentMap);
@@ -127,12 +151,9 @@ export default function Sessoes() {
 
           setSendingReview(false); 
           setReviewModalVisible(false); 
-          // Feedback visual imediato se caiu no catch
-          if (!sendingReview) Alert.alert("Registrado", "Obrigado pela avaliação!");
       }
   }
 
-  // Estrelas pequenas para o card
   const SmallStars = ({ score }: { score: number }) => (
       <View style={{flexDirection:'row'}}>
           {[1,2,3,4,5].map(i => <Feather key={i} name="star" size={14} color={i<=score?"#FFD700":"#CCC"}/>)}
@@ -141,17 +162,24 @@ export default function Sessoes() {
 
   const list = sessions.filter(s => activeTab === 'AGENDADA' ? (s.status === 'AGENDADA' || s.status === 'CONFIRMADA') : (s.status === 'CONCLUIDA' || s.status === 'CANCELADA'));
   const scheduledCount = sessions.filter(s => s.status === 'AGENDADA' || s.status === 'CONFIRMADA').length;
-  const completedCount = sessions.filter(s => s.status === 'CONCLUIDA').length;
+  const completedCount = sessions.filter(s => s.status === 'CONCLUIDA' || s.status === 'CANCELADA').length;
 
   const renderItem = ({ item }: { item: Sessao }) => {
       const d = new Date(item.scheduledDate);
       const statusColor = item.status === 'CANCELADA' ? '#FFEBEE' : (item.status === 'AGENDADA' ? '#FFF9C4' : '#C8E6C9');
       const myId = String(user?.id);
       const isMentor = String(item.mentor?.id || item.mentorId) === myId;
-      const userRating = myRatings[item.id]; // Verifica se já avaliei
+      const userRating = myRatings[item.id];
 
       return (
         <View style={styles.card}>
+           {/* Botão de Apagar no topo (Apenas no Histórico) */}
+           {activeTab === 'CONCLUIDA' && (
+               <TouchableOpacity style={styles.deleteIcon} onPress={() => deleteFromHistory(item.id)}>
+                   <Feather name="x" size={18} color="#999" />
+               </TouchableOpacity>
+           )}
+
            <View style={styles.roleContainer}>
                <View style={[styles.roleBadge, {backgroundColor: isMentor ? '#E3F2FD' : '#E8F5E9'}]}>
                    <Feather name={isMentor ? "award" : "book-open"} size={12} color={isMentor ? "#1565C0" : "#2E7D32"} />
@@ -217,7 +245,7 @@ export default function Sessoes() {
            <Text style={styles.title}>Minhas Sessões</Text>
            <View style={styles.statsRow}>
                <View style={styles.statBox}><Text style={styles.statNum}>{scheduledCount}</Text><Text style={styles.statLabel}>Agendadas</Text></View>
-               <View style={styles.statBox}><Text style={[styles.statNum, {color:'#4CAF50'}]}>{completedCount}</Text><Text style={styles.statLabel}>Concluídas</Text></View>
+               <View style={styles.statBox}><Text style={[styles.statNum, {color:'#4CAF50'}]}>{completedCount}</Text><Text style={styles.statLabel}>Histórico</Text></View>
            </View>
        </View>
        <View style={styles.tabs}>
@@ -258,6 +286,10 @@ const styles = StyleSheet.create({
   activeTabText: { color: '#FFF' },
   
   card: { backgroundColor: '#FFF', padding: 15, borderRadius: 10, marginBottom: 10, elevation: 1 },
+  
+  // Estilo do X de deletar
+  deleteIcon: { position: 'absolute', top: 10, right: 10, zIndex: 10, padding: 5 },
+
   roleContainer: { alignItems: 'flex-start', marginBottom: 10 },
   roleBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
   roleText: { fontSize: 10, fontWeight: 'bold', marginLeft: 4 },
@@ -267,7 +299,6 @@ const styles = StyleSheet.create({
   statusBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   statusText: { fontSize: 10, fontWeight: 'bold', color: '#333' },
   skill: { fontSize: 16, fontWeight: 'bold', color: '#333' },
-  
   peopleContainer: { marginTop: 5, gap: 2 },
   people: { color: '#666', fontSize: 12 },
   highlightText: { color: '#000080', fontWeight: 'bold' },
@@ -277,9 +308,8 @@ const styles = StyleSheet.create({
   btnLinkText: { color:'#1565C0', fontWeight:'bold', marginLeft:5, fontSize:12 },
   btnAction: { padding: 10, borderRadius: 5, alignItems: 'center', justifyContent: 'center', flex:1 },
   btnText: { color: '#FFF', fontWeight: 'bold' },
-  
   ratedBadge: { flexDirection:'row', alignItems:'center', backgroundColor:'#F9F9F9', padding:10, borderRadius:5, alignSelf:'flex-start' },
-
+  
   modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { width: '80%', backgroundColor: '#FFF', padding: 20, borderRadius: 10, alignItems: 'center' },
   inputReview: { width: '100%', height: 80, backgroundColor: '#F5F5F5', borderRadius: 8, padding: 10, textAlignVertical: 'top', marginBottom: 15 },
