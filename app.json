@@ -20,11 +20,18 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "package": "com.fiap.trocacomigo",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "commitHash": "923709b",
+      "eas": {
+        "projectId": "3a803026-cd84-4ba5-93e5-173d2571b8b2"
+      }
     }
   }
 }

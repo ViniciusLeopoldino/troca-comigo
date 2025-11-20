@@ -20,7 +20,7 @@ api.interceptors.request.use((config) => {
     // @ts-ignore
     config.headers['Authorization'] = `Bearer ${authToken}`;
   }
-  // console.log(`[API] 🚀 ${config.method?.toUpperCase()} ${config.url}`); // Descomente se quiser ver logs no terminal
+  console.log(`[API] 🚀 ${config.method?.toUpperCase()} ${config.url}`); // Descomente se quiser ver logs no terminal
   return config;
 }, (error) => {
   return Promise.reject(error);

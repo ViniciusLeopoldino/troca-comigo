@@ -1,5 +1,3 @@
-// ARQUIVO COMPLETO: src/services/fakeIA.ts
-
 export const gerarBioLocalmente = (nome: string, skills: string[]) => {
   const listaSkills = skills.length > 0 ? skills.join(', ') : 'diversas áreas';
   

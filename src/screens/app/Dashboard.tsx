@@ -144,8 +144,8 @@ export default function Dashboard() {
             </Text>
           </Text>
         </View>
-        <View style={styles.logoContainer}>
-          <Image source={require('../../../assets/logo.png')} style={{ width: 40, height: 40 }} resizeMode="contain" />
+        <View>
+          <Image source={require('../../../assets/logo.png')} style={{ width: 80, height: 80 }} />
         </View>
       </View>
 
@@ -213,7 +213,6 @@ const styles = StyleSheet.create({
   header: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 25, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   greeting: { fontSize: 24, fontWeight: 'bold', color: '#333' },
   subGreeting: { fontSize: 16, color: '#666', marginTop: 5 },
-  logoContainer: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center', elevation: 3 },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 30 },
   statsRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 15, marginBottom: 15 },
   cardStat: { flex: 1, borderRadius: 15, padding: 15, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', elevation: 2 },
