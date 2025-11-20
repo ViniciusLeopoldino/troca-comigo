@@ -18,7 +18,7 @@ O **Troca Comigo** é uma plataforma mobile desenvolvida para democratizar o ace
 
 ## 📱 Links Importantes
 
-- 🎥 **Vídeo de Demonstração (YouTube):** [LINK AQUI]
+- 🎥 **Vídeo de Demonstração (YouTube):** [Apresentação no YouTube](https://youtu.be/H46QpSL9ihs)
 - 📲 **Download do App (APK - Android):** [Baixar Versão Final (Expo EAS)](https://expo.dev/artifacts/eas/gJpgCkUxvU1B3yDJs88CJp.apk)
 - 🌐 **Backend API (Java):** [Link do Repositório da API](https://github.com/GuiFelSS/Troca_Comigo_Global_2_2025)
 
