@@ -84,7 +84,7 @@ Para garantir a usabilidade do aplicativo mesmo em cenários de instabilidade do
 
 1.  **Clone o repositório:**
     ```bash
-    git clone [SEU_LINK_DO_GIT]
+    git clone https://github.com/ViniciusLeopoldino/troca-comigo.git
     cd troca-comigo
     ```
 
